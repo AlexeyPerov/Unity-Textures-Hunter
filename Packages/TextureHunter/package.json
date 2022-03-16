@@ -1,0 +1,15 @@
+{
+  "name": "texture-hunter",
+  "version": "0.0.1",
+  "displayName": "Texture Hunter",
+  "description": "Unity project texture analysis tool.",
+  "unity": "2019.3",
+  "keywords": [
+    "references",
+    "tool"
+  ],
+  "author": {
+    "name": "Alexey Perov",
+    "url": "https://github.com/AlexeyPerov/Unity-Texture-Hunter"
+  }
+}
