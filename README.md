@@ -7,8 +7,22 @@
 ##
 This tool provides summary of all textures in Unity project.
 
+It makes an analysis of non-atlas textures to give some recommendations upon their compression settings:
+e.g. detect issues like
+- Only POT textures can be compressed to PVRTC format
+- Only textures with width/height being multiple of 4 can be compressed to Crunch format
+
+It also helps to analyze all your atlases at once and highlights issues if their textures used in Resources
+ and/or Addressables (which may lead to duplicated textures in build).
+
 All code combined into one script for easier portability.
 So you can just copy-paste [TextureHunter.cs](./Packages/TextureHunter/Editor/TextureHunter.cs) to your project in any Editor folder.
+
+Use "Tools/Texture Hunter" menu to launch it.
+
+| Textures  | Atlases |
+| ------------- | ------------- |
+| ![plot](./Screenshots/textures_screen.png) | ![plot](./Screenshots/atlases_screen.png) |
 
 ## Installation
 
