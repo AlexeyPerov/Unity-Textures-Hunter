@@ -20,9 +20,13 @@ So you can just copy-paste [TextureHunter.cs](./Packages/TextureHunter/Editor/Te
 
 Use "Tools/Texture Hunter" menu to launch it.
 
-| Textures  | Atlases |
-| ------------- | ------------- |
-| ![plot](./Screenshots/textures_screen.png) | ![plot](./Screenshots/atlases_screen.png) |
+##### Textures View
+
+![plot](./Screenshots/textures_screen.png) 
+
+##### Atlases View
+
+![plot](./Screenshots/atlases_screen.png) 
 
 ## Installation
 
