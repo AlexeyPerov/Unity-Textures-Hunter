@@ -37,3 +37,13 @@ Use "Tools/Texture Hunter" menu to launch it.
 
 Feel free to [report bugs, request new features](https://github.com/AlexeyPerov/Unity-Texture-Hunter/issues) 
 or to [contribute](https://github.com/AlexeyPerov/Unity-Texture-Hunter/pulls) to this project! 
+
+## Other tools
+
+##### Dependencies Hunter
+
+To find unreferenced assets in Unity project see [Dependencies-Hunter](https://github.com/AlexeyPerov/Unity-Dependencies-Hunter).
+
+##### Missing References Hunter
+
+To find missing or empty references in your assets see [Missing-References-Hunter](https://github.com/AlexeyPerov/Unity-MissingReferences-Hunter).
