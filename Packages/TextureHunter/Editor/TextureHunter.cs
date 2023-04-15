@@ -540,7 +540,16 @@ namespace TextureHunter
 
                 foreach (var directTexture in directTextures)
                 {
-                    textures.Add(AssetDatabase.GetAssetPath(directTexture), new List<TextureData>());
+                    var textureName = AssetDatabase.GetAssetPath(directTexture);
+                    if (!textures.ContainsKey(textureName))
+                    {
+                        textures.Add(textureName, new List<TextureData>());
+                    }
+                    else
+                    {
+                        Debug.LogWarning($"Texture name [{textureName}]" +
+                                         $" is presented in the atlas [{path}] twice");
+                    }
                 }
                 
                 return new AtlasData(path, type, typeName, 
