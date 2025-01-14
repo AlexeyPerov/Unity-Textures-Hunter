@@ -533,9 +533,38 @@ namespace TextureHunter
                 {
                     var isFolder = !Path.HasExtension(packable.Key);
 
-                    var isAddedDirectly = !isFolder && textureData.Path == packable.Key;
-                    var isAddedViaFolder = isFolder && textureData.Path.Contains(packable.Key.EndsWith(Path.DirectorySeparatorChar) ? packable.Key : packable.Key + Path.DirectorySeparatorChar);
-                    
+                    bool isAddedDirectly;
+                    bool isAddedViaFolder;
+
+                    if (isFolder)
+                    {
+                        isAddedDirectly = false;
+                        
+                        // Unity may store path with separators from another OS
+                        // so we need to check both cases and cannot just use Path.DirectorySeparatorChar
+                        
+                        // we have to ensure that there is a separator in the end of a packable folder
+                        // to filter folders which start with the same substring (like 'Asses/Buildings/' and 'Assets/BuildingsIcons/')
+                        
+                        var endsAsOnNix = packable.Key.EndsWith("/");
+                        var endsAsOnWindows = packable.Key.EndsWith("\\");
+                        
+                        if (endsAsOnNix || endsAsOnWindows)
+                        {
+                            isAddedViaFolder = textureData.Path.Contains(packable.Key);
+                        }
+                        else
+                        {
+                            isAddedViaFolder = textureData.Path.Contains(packable.Key + "/") ||
+                                               textureData.Path.Contains(packable.Key + "\\");
+                        }
+                    }
+                    else
+                    {
+                        isAddedViaFolder = false;
+                        isAddedDirectly = textureData.Path == packable.Key;
+                    }
+
                     if (isAddedDirectly || isAddedViaFolder)
                     {
                         atlasFound = true;
