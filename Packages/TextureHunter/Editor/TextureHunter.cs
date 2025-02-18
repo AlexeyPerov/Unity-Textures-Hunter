@@ -1,6 +1,7 @@
 // #define HUNT_ADDRESSABLES
 
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -21,23 +22,39 @@ namespace TextureHunter
     {
         private class Result
         {
-            public List<AtlasData> Atlases { get; } = new();
-            public List<TextureData> Textures { get; } = new();
+            public List<AtlasData> Atlases { get; } = new List<AtlasData>();
+            public List<TextureData> Textures { get; } = new List<TextureData>();
             public string OutputDescription { get; set; }
         }
         
-        private class AnalysisSettings 
+        private class AnalysisSettings
         {
+            public const int DefaultGCStep = 100000;
+            
             public bool MipMapsAreErrors { get; set; } = true;
             public bool ReadableAreErrors { get; set; }
             public bool SizeHigher4KAreErrors { get; set; } = true;
             public bool NoOverridenCompressionAsErrors { get; set; } = true;
+            public int GarbageCollectStep { get; set; } = DefaultGCStep;
+            
+            // limit number of assets in analysis to perform it faster for debug purposes
+            public int DebugLimit;
+            
+            public List<TextureImporterFormat> RecommendedFormats { get; set; } = new List<TextureImporterFormat>
+            {
+                TextureImporterFormat.ASTC_5x5,
+                TextureImporterFormat.ASTC_6x6,
+                TextureImporterFormat.ASTC_8x8,
+                TextureImporterFormat.ASTC_10x10,
+                TextureImporterFormat.ASTC_12x12,
+                TextureImporterFormat.ETC2_RGBA8Crunched
+            };
         }
 
         private class SearchPatternsSettings
         {
             // ReSharper disable once StringLiteralTypo
-            public readonly List<string> DefaultIgnorePatterns = new()
+            public readonly List<string> DefaultIgnorePatterns = new List<string>
             {
                 @"/Editor/",
                 @"/Editor Default Resources/",
@@ -47,7 +64,7 @@ namespace TextureHunter
             };
 
             // ReSharper disable once InconsistentNaming
-            public const string PATTERNS_PREFS_KEY = "TextureHunterIgnorePatterns";
+            public const string PATTERNS_PREFS_KEY = "TextureHunterIgnoreSearchPatterns";
 
             public List<string> IgnoredPatterns { get; set; }
         }
@@ -65,8 +82,8 @@ namespace TextureHunter
             public string PathFilter { get; set; }
             public OutputFilterType TypeFilter { get; set; }
             
-            public TexturesOutputSettings TexturesSettings { get; } = new();
-            public AtlasesOutputSettings AtlasesSettings { get; } = new();
+            public TexturesOutputSettings TexturesSettings { get; } = new TexturesOutputSettings();
+            public AtlasesOutputSettings AtlasesSettings { get; } = new AtlasesOutputSettings();
         }
 
         private class AtlasesOutputSettings : IPaginationSettings
@@ -132,16 +149,20 @@ namespace TextureHunter
             public string ReadableSize { get; }
             public List<PackableData> Packables { get; }
             public bool Foldout { get; set; }
-            public Dictionary<string, AtlasPlatformImportSettings> ImportSettings { get; } = new();
+            public Dictionary<string, AtlasPlatformImportSettings> ImportSettings { get; } =
+                new Dictionary<string, AtlasPlatformImportSettings>();
             public int SpritesCount { get; private set; }
+            public SpriteAtlas Atlas { get; }
             
             public AtlasData(
+                SpriteAtlas atlas,
                 string path,
                 Type type,
                 string typeName,
                 string readableSize,
                 Dictionary<string, List<TextureData>> packablesDictionary)
             {
+                Atlas = atlas;
                 Path = path;
                 Type = type;
                 TypeName = typeName;
@@ -173,9 +194,10 @@ namespace TextureHunter
  
                 CompressionQuality = Settings.compressionQuality;
 
-                IsAutomatic = !Settings.overridden;
+                IsDefaultPlatform = isDefault;
+                IsUsingDefaultSettings = !Settings.overridden;
 
-                if (!isDefault && IsAutomatic)
+                if (!isDefault && IsUsingDefaultSettings)
                 {
                     FormatActual = defaultFormat;
 
@@ -195,17 +217,15 @@ namespace TextureHunter
                 }
 
                 Description += $"[Q{CompressionQuality}]";
-
-                ActualFormatAsLoweredString = FormatActual.ToString().ToLowerInvariant();
             }
             
-            private TextureImporterPlatformSettings Settings { get; }
+            public bool IsDefaultPlatform { get; private set; }
+            public TextureImporterPlatformSettings Settings { get; }
             private TextureImporterFormat FormatSet { get; }
-            private TextureImporterFormat FormatActual { get; }
+            public TextureImporterFormat FormatActual { get; }
             private int CompressionQuality { get; }
             public string Description { get; }
-            public string ActualFormatAsLoweredString { get; }
-            public bool IsAutomatic { get; }
+            public bool IsUsingDefaultSettings { get; }
         }
 
         private class PackableData
@@ -257,7 +277,8 @@ namespace TextureHunter
             public bool InResources { get; }
             public bool IsAddressable { get; }
 
-            public Dictionary<string, TexturePlatformImportSettings> ImportSettings { get; } = new();
+            public Dictionary<string, TexturePlatformImportSettings> ImportSettings { get; } =
+                new Dictionary<string, TexturePlatformImportSettings>();
 
             public AtlasData Atlas { get; set; }
             
@@ -319,16 +340,17 @@ namespace TextureHunter
             public TexturePlatformImportSettings(TextureImporter importer,
                 string platform)
             {
-                Settings = platform == "Default" ? importer.GetDefaultPlatformTextureSettings() 
+                IsDefaultPlatform = platform == "Default";
+                Settings = IsDefaultPlatform ? importer.GetDefaultPlatformTextureSettings() 
                     : importer.GetPlatformTextureSettings(platform);
 
                 FormatSet = Settings.format;
 
                 CompressionQuality = Settings.compressionQuality;
 
-                IsAutomatic = FormatSet == TextureImporterFormat.Automatic;
+                IsUsingDefaultSettings = FormatSet == TextureImporterFormat.Automatic;
 
-                if (IsAutomatic)
+                if (IsUsingDefaultSettings)
                 {
                     FormatActual = importer.GetAutomaticFormat(platform);
 
@@ -352,13 +374,14 @@ namespace TextureHunter
                 ActualFormatAsLoweredString = FormatActual.ToString().ToLowerInvariant();
             }
             
-            private TextureImporterPlatformSettings Settings { get; }
+            public TextureImporterPlatformSettings Settings { get; }
             private TextureImporterFormat FormatSet { get; }
-            private TextureImporterFormat FormatActual { get; }
+            public TextureImporterFormat FormatActual { get; }
             private int CompressionQuality { get; }
             public string Description { get; }
             public string ActualFormatAsLoweredString { get; }
-            public bool IsAutomatic { get; }
+            public bool IsUsingDefaultSettings { get; }
+            public bool IsDefaultPlatform { get; }
         }
 
         private class TextureInfo
@@ -399,7 +422,10 @@ namespace TextureHunter
         private SearchPatternsSettings _searchPatternsSettings;
         
         private bool _analysisSettingsFoldout;
+        private bool _batchOperationsFoldout;
         private bool _searchPatternsSettingsFoldout;
+        
+        private bool _batchOperationsJustLog;
         
         private Vector2 _atlasesPagesScroll = Vector2.zero;
         private Vector2 _atlasesScroll = Vector2.zero;
@@ -420,38 +446,55 @@ namespace TextureHunter
         private const string DimensionsFallbackIssue = "Texture is neither POT nor multiple of 4: " +
                                                        "possible compression issue";
 
-        private void PopulateAssetsList()
+        private bool _analysisOngoing;
+
+        private IEnumerator PopulateAssetsList()
         {
+            _analysisOngoing = true;
+            
             _result = new Result();
-            _outputSettings = new OutputSettings();
+            _outputSettings ??= new OutputSettings();
+
+            if (_analysisSettings.GarbageCollectStep < 0)
+            {
+                _analysisSettings.GarbageCollectStep = AnalysisSettings.DefaultGCStep;
+            }
 
             Clear();
             Show();
             
             EditorUtility.ClearProgressBar();
 
-            var assetPaths = AssetDatabase.GetAllAssetPaths().ToList();
+            var assetPaths = AssetDatabase.GetAllAssetPaths();
             
             var filteredOutput = new StringBuilder();
             filteredOutput.AppendLine("Assets ignored by pattern:");
             
             var count = 0;
-            
-            foreach (var assetPath in assetPaths)
+
+            for (var assetIndex = 0; assetIndex < assetPaths.Length; assetIndex++)
             {
+                if (_analysisSettings.GarbageCollectStep != 0 && assetIndex % _analysisSettings.GarbageCollectStep == 0)
+                {
+                    GC.Collect();
+                    yield return 0.05f;
+                    GC.Collect();
+                }
+                
+                var assetPath = assetPaths[assetIndex];
                 EditorUtility.DisplayProgressBar("Textures Hunter", "Scanning for atlases",
-                    (float) count / assetPaths.Count);
+                    (float)count / assetPaths.Length);
 
                 var type = AssetDatabase.GetMainAssetTypeAtPath(assetPath);
-                
+
                 var validAssetType = type != null;
 
-                if (!validAssetType) 
+                if (!validAssetType)
                     continue;
-                
+
                 if (type == typeof(SpriteAtlas))
                 {
-                    var validForOutput = IsValidForOutput(assetPath, 
+                    var validForOutput = IsValidForOutput(assetPath,
                         _searchPatternsSettings.IgnoredPatterns);
 
                     if (!validForOutput)
@@ -459,25 +502,36 @@ namespace TextureHunter
                         filteredOutput.AppendLine(assetPath);
                         continue;
                     }
-                    
+
                     count++;
-                    
+
                     _result.Atlases.Add(CreateAtlasData(assetPath));
+
+                    if (_analysisSettings.DebugLimit > 0 && _result.Atlases.Count > _analysisSettings.DebugLimit)
+                        break;
                 }
             }
-            
-            foreach (var assetPath in assetPaths)
+
+            for (var assetIndex = 0; assetIndex < assetPaths.Length; assetIndex++)
             {
+                if (_analysisSettings.GarbageCollectStep != 0 && assetIndex % _analysisSettings.GarbageCollectStep == 0)
+                {
+                    GC.Collect();
+                    yield return 0.05f;
+                    GC.Collect();
+                }
+                
+                var assetPath = assetPaths[assetIndex];
                 EditorUtility.DisplayProgressBar("Textures Hunter", "Scanning for textures",
-                    (float) count / assetPaths.Count);
+                    (float)count / assetPaths.Length);
 
                 var type = AssetDatabase.GetMainAssetTypeAtPath(assetPath);
-                
+
                 var validAssetType = type != null;
 
-                if (!validAssetType) 
+                if (!validAssetType)
                     continue;
-  
+
                 if (type != typeof(SpriteAtlas))
                 {
                     count++;
@@ -486,12 +540,11 @@ namespace TextureHunter
                 if (type == typeof(Texture) || type == typeof(Texture2D))
                 {
                     var textureData = CreateTextureData(assetPath);
-                    
-                    var atlasFound = TryProcessAsAtlasTexture(textureData);   
+                    var atlasFound = TryProcessAsAtlasTexture(textureData);
 
                     if (!atlasFound)
                     {
-                        var validForOutput = IsValidForOutput(assetPath, 
+                        var validForOutput = IsValidForOutput(assetPath,
                             _searchPatternsSettings.IgnoredPatterns);
 
                         if (!validForOutput)
@@ -499,12 +552,23 @@ namespace TextureHunter
                             filteredOutput.AppendLine(assetPath);
                             continue;
                         }
-                        
+
                         ProcessAsNonAtlasTexture(textureData);
-                        
+
                         _result.Textures.Add(textureData);
+                        
+                        if (_analysisSettings.DebugLimit > 0 && _result.Textures.Count > _analysisSettings.DebugLimit)
+                            break;
                     }
                 }
+            }
+            
+            GC.Collect();
+            
+            if (_analysisSettings.GarbageCollectStep != 0)
+            {
+                yield return 0.1f;
+                GC.Collect();
             }
 
             PostProcessAtlases();
@@ -519,6 +583,8 @@ namespace TextureHunter
             Debug.Log(filteredOutput.ToString());
             Debug.Log(_result.OutputDescription);
             filteredOutput.Clear();
+
+            _analysisOngoing = false;
         }
 
         private bool TryProcessAsAtlasTexture(TextureData textureData)
@@ -564,7 +630,7 @@ namespace TextureHunter
                         isAddedViaFolder = false;
                         isAddedDirectly = textureData.Path == packable.Key;
                     }
-
+                    
                     if (isAddedDirectly || isAddedViaFolder)
                     {
                         atlasFound = true;
@@ -677,13 +743,13 @@ namespace TextureHunter
 
             if (_analysisSettings.NoOverridenCompressionAsErrors)
             {
-                if (iOSSettings.IsAutomatic || androidSettings.IsAutomatic)
+                if (iOSSettings.IsUsingDefaultSettings || androidSettings.IsUsingDefaultSettings)
                 {
                     textureData.TrySetWarningLevel(2);
                     textureData.AddCustomWarning("Texture uses Automatic compression. Is it intended?");
                 }
             }
-
+            
             textureData.ImportSettings["iOS"] = iOSSettings;
             textureData.ImportSettings["Android"] = androidSettings;
 
@@ -703,6 +769,13 @@ namespace TextureHunter
                     textureData.TrySetWarningLevel(2);
                     textureData.AddCustomWarning(
                         $"{settings.Key}: only POT textures can use PVRTC format");
+                }
+
+                if (!settings.Value.IsDefaultPlatform && !_analysisSettings.RecommendedFormats.Contains(settings.Value.FormatActual))
+                {
+                    textureData.TrySetWarningLevel(2);
+                    textureData.AddCustomWarning(
+                        $"{settings.Key}: does not use recommended compression");
                 }
             }
         }
@@ -766,7 +839,7 @@ namespace TextureHunter
                 }
             }
 
-            var atlasData = new AtlasData(path, type, typeName, 
+            var atlasData = new AtlasData(atlas, path, type, typeName, 
                 CommonUtilities.GetReadableSize(bytesSize), packablesDictionary);
 
             ProcessSpriteAtlasTexture(atlasData, atlas);
@@ -780,6 +853,7 @@ namespace TextureHunter
             var androidAutomatic = false;
             
             var textureSettings = atlas.GetTextureSettings();
+            
 
             var defaultPlatformSettings = atlas.GetPlatformSettings("DefaultTexturePlatform");
 
@@ -799,8 +873,15 @@ namespace TextureHunter
             {
                 var androidSettings =
                     new AtlasPlatformImportSettings(androidPlatformSettings, false, defaultPlatformSettings.format);
-                androidAutomatic = androidSettings.IsAutomatic;
+                androidAutomatic = androidSettings.IsUsingDefaultSettings;
                 atlasData.ImportSettings["Android"] = androidSettings;
+                
+                if (!_analysisSettings.RecommendedFormats.Contains(androidSettings.FormatActual))
+                {
+                    atlasData.TrySetWarningLevel(2);
+                    atlasData.AddCustomWarning(
+                        $"Does not use recommended compression");
+                }
             }
 
             var iOSPlatformSettings = atlas.GetPlatformSettings("iPhone");
@@ -809,8 +890,15 @@ namespace TextureHunter
             {
                 var iOSSettings =
                     new AtlasPlatformImportSettings(iOSPlatformSettings, false, defaultPlatformSettings.format);
-                iOSAutomatic = iOSSettings.IsAutomatic;
+                iOSAutomatic = iOSSettings.IsUsingDefaultSettings;
                 atlasData.ImportSettings["iOS"] = iOSSettings;
+                
+                if (!_analysisSettings.RecommendedFormats.Contains(iOSSettings.FormatActual))
+                {
+                    atlasData.TrySetWarningLevel(2);
+                    atlasData.AddCustomWarning(
+                        $"Does not use recommended compression");
+                }
             }
 
             if (_analysisSettings.MipMapsAreErrors && textureSettings.generateMipMaps)
@@ -839,6 +927,233 @@ namespace TextureHunter
                 
             return new TextureData(path, type, typeName, bytesSize, CommonUtilities.GetReadableSize(bytesSize));
         }
+        
+        private void SetAtlasesQuality(string platform, bool performChanges = true, int crunchedQuality = 30, int astcQuality = 50)
+        {
+            if (_result == null)
+                return;
+
+            var counter = 0;
+            
+            foreach (var atlas in _result.Atlases)
+            {
+                foreach (var setting in atlas.ImportSettings)
+                {
+                    if (!setting.Value.IsDefaultPlatform && !setting.Value.IsUsingDefaultSettings && setting.Key == platform)
+                    {
+                        if (setting.Value.FormatActual == TextureImporterFormat.ETC2_RGBA8Crunched)
+                        {
+                            if (setting.Value.Settings.compressionQuality != crunchedQuality)
+                            {
+                                Debug.LogWarning($"Changing: {atlas.Name} / {setting.Key} quality to {crunchedQuality}");
+
+                                if (performChanges)
+                                {
+                                    setting.Value.Settings.compressionQuality = crunchedQuality;
+                                    atlas.Atlas.SetPlatformSettings(setting.Value.Settings);
+                                }
+
+                                counter++;
+                            }
+                        }
+                        else if (CommonUtilities.IsAnyAstc(setting.Value.FormatActual))
+                        {
+                            var isDirty = false;
+                            
+                            var redundantLevel =
+                                setting.Value.FormatActual == TextureImporterFormat.ASTC_5x5 || setting.Value.FormatActual == TextureImporterFormat.ASTC_4x4;
+
+                            if (redundantLevel)
+                            {
+                                Debug.LogWarning(
+                                    $"Changing: {atlas.Name} / {setting.Key} format to {TextureImporterFormat.ASTC_6x6}");
+                                
+                                if (performChanges)
+                                    setting.Value.Settings.format = TextureImporterFormat.ASTC_6x6;
+                                isDirty = true;
+                            }
+
+                            if (setting.Value.Settings.compressionQuality != astcQuality)
+                            {
+                                Debug.LogWarning(
+                                    $"Changing: {atlas.Name} / {setting.Key} format to quality {astcQuality}");
+                                
+                                if (performChanges)
+                                    setting.Value.Settings.compressionQuality = astcQuality;
+                                isDirty = true;
+                            }
+
+                            if (isDirty)
+                            {
+                                if (performChanges)
+                                    atlas.Atlas.SetPlatformSettings(setting.Value.Settings);
+                                counter++;
+                            }
+                        }
+                    }
+                }
+            }
+
+            Debug.LogWarning($"Changed {counter} atlases");
+            
+            AssetDatabase.SaveAssets();
+        }
+
+        private IEnumerator SetTexturesQuality(string platform, bool performChanges = true, int crunchedQuality = 30, int astcQuality = 50)
+        {
+            if (_result == null)
+                yield break;
+
+            _analysisOngoing = true;
+            
+            var changeCounter = 0;
+
+            foreach (var texture in _result.Textures)
+            {
+                var prevCounter = changeCounter;
+                
+                SetTextureQuality(platform, ref changeCounter, texture, performChanges, crunchedQuality, astcQuality);
+                
+                if (prevCounter != changeCounter && changeCounter % 100 == 0)
+                {
+                    GC.Collect();
+                    Debug.Log($"GC call. Changed {changeCounter} textures");
+                    yield return 0.05f;
+                    GC.Collect();
+                }
+            }
+            
+            Debug.LogWarning($"Changed {changeCounter} textures");
+            
+            _analysisOngoing = false;
+            
+            AssetDatabase.SaveAssets();
+        }
+
+        private void SetTextureQuality(string platform, ref int counter, TextureData texture, bool performChanges = true, 
+            int crunchedQuality = 30, int astcQuality = 50)
+        {
+            foreach (var setting in texture.ImportSettings)
+            {
+                if (!setting.Value.IsDefaultPlatform && !setting.Value.IsUsingDefaultSettings && setting.Key == platform)
+                {
+                    if (setting.Value.FormatActual == TextureImporterFormat.ETC2_RGBA8Crunched)
+                    {
+                        if (setting.Value.Settings.compressionQuality != crunchedQuality)
+                        {
+                            var importer = texture.Importer;
+
+                            if (importer != null)
+                            {
+                                Debug.LogWarning(
+                                    $"Changing: {texture.Name} / {setting.Key} quality to {crunchedQuality}");
+
+                                if (performChanges)
+                                {
+                                    setting.Value.Settings.compressionQuality = crunchedQuality;
+
+                                    importer.SetPlatformTextureSettings(setting.Value.Settings);
+                                    importer.SaveAndReimport();
+                                }
+
+                                counter++;
+                            }
+                        }
+                    }
+                    else if (CommonUtilities.IsAnyAstc(setting.Value.FormatActual))
+                    {
+                        var importer = texture.Importer;
+
+                        if (importer != null)
+                        {
+                            var isDirty = false;
+
+                            var redundantLevel =
+                                setting.Value.FormatActual == TextureImporterFormat.ASTC_5x5 || setting.Value.FormatActual == TextureImporterFormat.ASTC_4x4;
+
+                            if (redundantLevel)
+                            {
+                                Debug.LogWarning(
+                                    $"Changing: {texture.Name} / {setting.Key} format to {TextureImporterFormat.ASTC_6x6}");
+                                if (performChanges)
+                                    setting.Value.Settings.format = TextureImporterFormat.ASTC_6x6;
+                                isDirty = true;
+                            }
+
+                            if (setting.Value.Settings.compressionQuality != astcQuality)
+                            {
+                                Debug.LogWarning(
+                                    $"Changing: {texture.Name} / {setting.Key} format to quality {astcQuality}");
+                                if (performChanges)
+                                    setting.Value.Settings.compressionQuality = astcQuality;
+                                isDirty = true;
+                            }
+
+                            if (isDirty)
+                            {
+                                if (performChanges)
+                                {
+                                    importer.SetPlatformTextureSettings(setting.Value.Settings);
+                                    importer.SaveAndReimport();
+                                }
+
+                                counter++;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        private IEnumerator FixTexturesAutomaticCompression(string platform, TextureImporterFormat format, 
+            int quality, bool performChanges = true)
+        {
+            if (_result == null)
+                yield break;
+
+            _analysisOngoing = true;
+            
+            var changeCounter = 0;
+
+            foreach (var texture in _result.Textures)
+            {
+                if (texture.WarningLevel < 2)
+                    continue;
+
+                if (!texture.ImportSettings.ContainsKey(platform))
+                    continue;
+
+                var settings = texture.ImportSettings[platform];
+                
+                if (!settings.IsUsingDefaultSettings)
+                    continue;
+
+                settings.Settings.format = format;
+                settings.Settings.compressionQuality = quality;
+
+                if (performChanges)
+                {
+                    texture.Importer.SetPlatformTextureSettings(settings.Settings);
+                    texture.Importer.SaveAndReimport();
+                }
+                
+                changeCounter++;
+                
+                if (changeCounter % 100 == 0)
+                {
+                    GC.Collect();
+                    Debug.Log($"GC call. Changed {changeCounter} textures");
+                    yield return 0.05f;
+                    GC.Collect();
+                }
+            }
+            
+            Debug.LogWarning($"Changed {changeCounter} textures");
+            
+            _analysisOngoing = false;
+            
+            AssetDatabase.SaveAssets();
+        }
 
         private void OnGUI()
         {
@@ -848,24 +1163,32 @@ namespace TextureHunter
             
             var prevColor = GUI.color;
             GUI.color = Color.green;
-            
-            if (GUILayout.Button("Run Analysis", GUILayout.Width(300f)))
+
+            if (!_analysisOngoing)
             {
-                PopulateAssetsList();
+                var postfix = _result != null ? " (Overrides last results)" : string.Empty;
+                if (GUILayout.Button($"Run Analysis{postfix}", GUILayout.Width(300f)))
+                {
+                    PocketEditorCoroutine.Start(PopulateAssetsList(), this);
+                }
             }
-            
+            else
+            {
+                GUILayout.Label("Analysis ongoing...");
+            }
+
             GUI.color = prevColor;
             
             GUILayout.FlexibleSpace();
             
             EditorGUILayout.EndHorizontal();
-            
+
             OnSearchPatternsSettingsGUI();
             OnAnalysisSettingsGUI();
             
             GUIUtilities.HorizontalLine();
 
-            if (_result == null)
+            if (_result == null || _analysisOngoing)
             {
                 return;
             }
@@ -874,9 +1197,60 @@ namespace TextureHunter
             EditorGUILayout.LabelField(_result.OutputDescription);
 
             EditorGUILayout.EndHorizontal();
-            
+
             GUIUtilities.HorizontalLine();
-            
+
+            _batchOperationsFoldout = EditorGUILayout.Foldout(_batchOperationsFoldout, "Batch Operations");
+
+            if (_batchOperationsFoldout)
+            {
+                _batchOperationsJustLog = EditorGUILayout.Toggle("Just log", _batchOperationsJustLog);
+                
+                EditorGUILayout.BeginHorizontal();
+
+                if (GUILayout.Button("[Android] Atlases: Set ETC2 Crunched quality to 30; min ASTC to 6x6 and quality to 50"))
+                {
+                    SetAtlasesQuality("Android", !_batchOperationsJustLog);
+                }
+
+                if (GUILayout.Button("[Android] Textures: Set ETC2 Crunched quality to 30; min ASTC to 6x6 and quality to 50"))
+                {
+                    PocketEditorCoroutine.Start(SetTexturesQuality("Android", !_batchOperationsJustLog), this);
+                }
+                
+                EditorGUILayout.EndHorizontal();
+                
+                EditorGUILayout.BeginHorizontal();
+
+                if (GUILayout.Button("[iOS] Atlases: Set ETC2 Crunched quality to 30; min ASTC to 6x6 and quality to 50"))
+                {
+                    SetAtlasesQuality("iOS", !_batchOperationsJustLog);
+                }
+
+                if (GUILayout.Button("[iOS] Textures: Set ETC2 Crunched quality to 30; min ASTC to 6x6 and quality to 50"))
+                {
+                    PocketEditorCoroutine.Start(SetTexturesQuality("iOS", !_batchOperationsJustLog), this);
+                }
+                
+                EditorGUILayout.EndHorizontal();
+                
+                EditorGUILayout.BeginHorizontal();
+                
+                if (GUILayout.Button("[Android] Textures: Override all non yet overriden textures to ASTC 8x8"))
+                {
+                    PocketEditorCoroutine.Start(FixTexturesAutomaticCompression("Android", TextureImporterFormat.ASTC_8x8, 50, !_batchOperationsJustLog), this);
+                }
+                
+                if (GUILayout.Button("[iOS] Textures: Override all non yet overriden textures to ASTC 8x8"))
+                {
+                    PocketEditorCoroutine.Start(FixTexturesAutomaticCompression("iOS", TextureImporterFormat.ASTC_8x8, 50, !_batchOperationsJustLog), this);
+                }
+                
+                EditorGUILayout.EndHorizontal();
+            }
+
+            GUIUtilities.HorizontalLine();
+
             EditorGUILayout.BeginHorizontal();
 
             prevColor = GUI.color;
@@ -917,6 +1291,8 @@ namespace TextureHunter
             textFieldStyle.alignment = prevTextFieldAlignment;
 
             EditorGUILayout.EndHorizontal();
+            
+            
 
             GUIUtilities.HorizontalLine();
 
@@ -1079,7 +1455,7 @@ namespace TextureHunter
                     
                     if (asset.CustomWarnings != null)
                     {
-                        EditorGUILayout.LabelField("Warnings [" + asset.CustomWarnings.Count + "]:");
+                        EditorGUILayout.LabelField($"Warnings [{asset.CustomWarnings.Count}]:");
                         foreach (var customWarning in asset.CustomWarnings)
                         {
                             EditorGUILayout.LabelField(customWarning);
@@ -1357,6 +1733,58 @@ namespace TextureHunter
             }
             
             GUILayout.EndHorizontal();
+            
+            GUILayout.Label(
+                "*If you face OOM during analysis then try to lower GC parameter below");
+            _analysisSettings.GarbageCollectStep = EditorGUILayout.IntField("GC once in (iterations):", _analysisSettings.GarbageCollectStep);
+            
+            GUILayout.Label(
+                "*Below is a debug option to limit number of assets in the analysis");
+            _analysisSettings.DebugLimit = EditorGUILayout.IntField("Assets Debug Limit:", _analysisSettings.DebugLimit);
+            
+            GUILayout.Label("Recommended Formats");
+
+            var count = _analysisSettings.RecommendedFormats.Count;
+            
+            GUILayout.BeginHorizontal();
+
+            if (count > 0)
+            {
+                if (GUILayout.Button("Remove"))
+                {
+                    count--;
+                }
+            }
+
+            if (GUILayout.Button("Add"))
+            {
+                count++;
+            }
+            
+            GUILayout.FlexibleSpace();
+
+            GUILayout.EndHorizontal();
+            
+            if (count != _analysisSettings.RecommendedFormats.Count)
+            {
+                var newList = new List<TextureImporterFormat>(count);
+
+                for (var i = 0; i < count; i++)
+                {
+                    var importerFormat = i < _analysisSettings.RecommendedFormats.Count ? _analysisSettings.RecommendedFormats[i] 
+                        : TextureImporterFormat.ASTC_6x6;
+                    newList.Add(importerFormat);
+                }
+
+                _analysisSettings.RecommendedFormats = newList;
+            }
+
+            var formats = _analysisSettings.RecommendedFormats;
+            
+            for (var i = 0; i < formats.Count; i++)
+            {
+                formats[i] = (TextureImporterFormat)EditorGUILayout.EnumPopup($"[{i}] Format: {formats[i]}", formats[i]);
+            }
         }
         
         private void OnSearchPatternsSettingsGUI()
@@ -1605,6 +2033,11 @@ namespace TextureHunter
         {
             return x != 0 && (x & (x - 1)) == 0;
         }
+
+        public static bool IsAnyAstc(TextureImporterFormat format)
+        {
+            return format == TextureImporterFormat.ASTC_4x4 || format == TextureImporterFormat.ASTC_5x5 || format == TextureImporterFormat.ASTC_6x6 || format == TextureImporterFormat.ASTC_8x8 || format == TextureImporterFormat.ASTC_10x10 || format == TextureImporterFormat.ASTC_12x12;
+        }
         
         public static string GetReadableTypeName(Type type)
         {
@@ -1647,6 +2080,62 @@ namespace TextureHunter
 #else
             return false;
 #endif
+        }
+    }
+    
+    internal class PocketEditorCoroutine
+    {
+        private readonly bool _hasOwner;
+        private readonly WeakReference _ownerReference;
+        private IEnumerator _routine;
+        private double? _lastTimeWaitStarted;
+
+        public static PocketEditorCoroutine Start(IEnumerator routine, EditorWindow owner = null)
+        {
+            return new PocketEditorCoroutine(routine, owner);
+        }
+        
+        private PocketEditorCoroutine(IEnumerator routine, EditorWindow owner = null)
+        {
+            _routine = routine ?? throw new ArgumentNullException(nameof(routine));
+            EditorApplication.update += OnUpdate;
+            if (owner == null) return;
+            _ownerReference = new WeakReference(owner);
+            _hasOwner = true;
+        }
+
+        public void Stop()
+        {
+            EditorApplication.update -= OnUpdate;
+            _routine = null;
+        }
+        
+        private void OnUpdate()
+        {
+            if (_hasOwner && (_ownerReference == null || (_ownerReference != null && !_ownerReference.IsAlive)))
+            {
+                Stop();
+                return;
+            }
+            
+            var result = MoveNext(_routine);
+            if (!result.HasValue || result.Value) return;
+            Stop();
+        }
+
+        private bool? MoveNext(IEnumerator enumerator)
+        {
+            if (enumerator.Current is not float current) 
+                return enumerator.MoveNext();
+            
+            _lastTimeWaitStarted ??= EditorApplication.timeSinceStartup;
+            
+            if (!(_lastTimeWaitStarted.Value + current
+                  <= EditorApplication.timeSinceStartup))
+                return null;
+
+            _lastTimeWaitStarted = null;
+            return enumerator.MoveNext();
         }
     }
 }
