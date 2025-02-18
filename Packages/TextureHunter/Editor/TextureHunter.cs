@@ -2125,16 +2125,13 @@ namespace TextureHunter
 
         private bool? MoveNext(IEnumerator enumerator)
         {
-            if (enumerator.Current is not float current) 
-                return enumerator.MoveNext();
-            
-            _lastTimeWaitStarted ??= EditorApplication.timeSinceStartup;
-            
-            if (!(_lastTimeWaitStarted.Value + current
-                  <= EditorApplication.timeSinceStartup))
-                return null;
-
-            _lastTimeWaitStarted = null;
+            if (enumerator.Current is float current)
+            {
+                _lastTimeWaitStarted ??= EditorApplication.timeSinceStartup;
+                if (!(_lastTimeWaitStarted.Value + current <= EditorApplication.timeSinceStartup))
+                    return null;
+                _lastTimeWaitStarted = null;
+            }
             return enumerator.MoveNext();
         }
     }
