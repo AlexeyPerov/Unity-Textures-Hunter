@@ -52,3 +52,8 @@ To find unreferenced assets in Unity project see [Dependencies-Hunter](https://g
 ##### Missing References Hunter
 
 To find missing or empty references in your assets see [Missing-References-Hunter](https://github.com/AlexeyPerov/Unity-MissingReferences-Hunter).
+
+##### Editor Coroutines
+
+- Unity Editor Coroutines alternative version [Lite-Editor-Coroutines](https://github.com/AlexeyPerov/Unity-Lite-Editor-Coroutines).
+- Simplified and compact version [Pocket-Editor-Coroutines](https://github.com/AlexeyPerov/Unity-Pocket-Editor-Coroutines).
