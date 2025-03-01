@@ -47,11 +47,11 @@ or to [contribute](https://github.com/AlexeyPerov/Unity-Texture-Hunter/pulls) to
 
 ##### Dependencies Hunter
 
-To find unreferenced assets in Unity project see [Dependencies-Hunter](https://github.com/AlexeyPerov/Unity-Dependencies-Hunter).
+- To find unreferenced assets in Unity project see [Dependencies-Hunter](https://github.com/AlexeyPerov/Unity-Dependencies-Hunter).
 
 ##### Missing References Hunter
 
-To find missing or empty references in your assets see [Missing-References-Hunter](https://github.com/AlexeyPerov/Unity-MissingReferences-Hunter).
+- To find missing or empty references in your assets see [Missing-References-Hunter](https://github.com/AlexeyPerov/Unity-MissingReferences-Hunter).
 
 ##### Editor Coroutines
 
