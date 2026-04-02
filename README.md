@@ -36,7 +36,7 @@ Use "Tools/Texture Hunter" menu to launch it.
 ## Installation
 
  1. Just copy and paste file [TextureHunter.cs](./Packages/TextureHunter/Editor/TextureHunter.cs) inside Editor folder
- 2. [WIP] via Unity's Package Manager 
+ 2. via Unity's Package Manager 
 
 ## Contributions
 
