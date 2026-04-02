@@ -27,11 +27,11 @@ Use "Tools/Texture Hunter" menu to launch it.
 
 ##### Textures View
 
-![plot](./Screenshots/textures_screen.png) 
+![plot](./Documentation~/textures_screen.png) 
 
 ##### Atlases View
 
-![plot](./Screenshots/atlases_screen.png) 
+![plot](./Documentation~/atlases_screen.png) 
 
 ## Installation
 
