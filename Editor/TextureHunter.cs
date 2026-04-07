@@ -2074,7 +2074,6 @@ namespace TextureHunter
             GUIUtilities.HorizontalLine();
             
             EditorGUILayout.LabelField("Please also note that any changes in this settings will be applied in the next 'Run Analysis' launch", GUILayout.Width(650f));
-            // EditorGUILayout.LabelField("will be applied in the next 'Run Analysis' launch", GUILayout.Width(450f));
             
             GUIUtilities.HorizontalLine();
         }
