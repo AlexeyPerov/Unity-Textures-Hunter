@@ -53,6 +53,10 @@ or to [contribute](https://github.com/AlexeyPerov/Unity-Texture-Hunter/pulls) to
 
 - To find missing or empty references in your assets see [Missing-References-Hunter](https://github.com/AlexeyPerov/Unity-MissingReferences-Hunter).
 
+##### Materials Hunter
+
+- To analyze your materials and renderers see [Materials-Hunter](https://github.com/AlexeyPerov/Unity-Materials-Hunter).
+
 ##### Editor Coroutines
 
 - Unity Editor Coroutines alternative version [Lite-Editor-Coroutines](https://github.com/AlexeyPerov/Unity-Lite-Editor-Coroutines).
