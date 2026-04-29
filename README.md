@@ -38,16 +38,24 @@ Use "Tools/Texture Hunter" menu to launch it.
  1. Just copy and paste file [TextureHunter.cs](./Packages/TextureHunter/Editor/TextureHunter.cs) inside Editor folder
  2. via Unity's Package Manager. Add as https://github.com/AlexeyPerov/Unity-Textures-Hunter.git
 
+---
+
 ## Contributions
 
-Feel free to [report bugs, request new features](https://github.com/AlexeyPerov/Unity-Texture-Hunter/issues) 
-or to [contribute](https://github.com/AlexeyPerov/Unity-Texture-Hunter/pulls) to this project! 
+Feel free to report bugs, request new features
+or to contribute to this project!
+
+---
 
 ## Other tools
 
 ##### Dependencies Hunter
 
 - To find unreferenced assets in Unity project see [Dependencies-Hunter](https://github.com/AlexeyPerov/Unity-Dependencies-Hunter).
+
+##### Addressables Inspector
+
+- To analyze addressables layout [Addressables-Inspector](https://github.com/AlexeyPerov/Unity-Addressables-Inspector).
 
 ##### Missing References Hunter
 
@@ -56,6 +64,10 @@ or to [contribute](https://github.com/AlexeyPerov/Unity-Texture-Hunter/pulls) to
 ##### Materials Hunter
 
 - To analyze your materials and renderers see [Materials-Hunter](https://github.com/AlexeyPerov/Unity-Materials-Hunter).
+
+##### Asset Inspector
+
+- To analyze asset dependencies [Asset-Inspector](https://github.com/AlexeyPerov/Unity-Asset-Inspector).
 
 ##### Editor Coroutines
 
