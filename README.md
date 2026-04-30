@@ -25,6 +25,46 @@ So you can just copy-paste [TextureHunter.cs](./Packages/TextureHunter/Editor/Te
 
 Use "Tools/Texture Hunter" menu to launch it.
 
+## What it checks
+
+Texture warnings include:
+
+- Compression compatibility problems, such as PVRTC requiring power-of-two textures or Crunch requiring width/height divisible by 4.
+- Textures larger than recommended limits.
+- Read/write and mipmap settings that may be unwanted for runtime content.
+- Missing platform overrides or import settings that differ from the recommended configuration.
+
+Atlas warnings include:
+
+- Ambiguous atlas packables where different atlases may include the same texture.
+- Textures that appear in more than one atlas.
+- Atlas textures that are also in `Resources` or Addressables, which can cause duplicate texture data in a build.
+- Double-compression risks when a texture is already compressed and then packed into a compressed atlas.
+
+## Working with results
+
+The window has separate Textures and Atlases views.
+Both views support path filtering, warning-level filtering, sorting, and pagination for large projects.
+
+Use `Warnings Level 2+ Only` to focus on stronger recommendations first.
+
+## Batch operations
+
+Batch operations can apply importer fixes to textures or atlases in bulk.
+Enable `Just log` first to preview the changes in the Console without saving anything.
+When `Just log` is disabled, applied operations write importer changes and save assets.
+
+![plot](./Documentation~/th-batch.png)
+
+## Analysis settings
+
+Important settings that affect results:
+
+- `Try Detect Addressables` uses reflection on Addressables settings so textures that are both packed in atlases and marked Addressable can be flagged as possible build duplicates.
+- Warning toggles control which import settings are treated as issues during analysis.
+- `Garbage Collect Step` can reduce memory pressure in huge projects by periodically collecting during analysis.
+- `Debug Limit` limits how many atlases/textures are processed, which is useful while testing settings on very large projects.
+
 ##### Textures View
 
 ![plot](./Documentation~/textures_screen.png) 

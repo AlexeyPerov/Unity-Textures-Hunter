@@ -3,6 +3,16 @@
 All notable changes to this project will be documented in this file.
 The changelog format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
+## [1.2.0] - 2026-04-30
+
+### Added
+- Embed layout
+- New issues to analyze
+
+### Changed
+- No defines needed for Addressables support
+- Batch UI improvements and additional settings
+
 ## [1.1.1] - 2026-04-02
 
 ### Fixed
